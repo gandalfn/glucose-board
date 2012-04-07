@@ -1,0 +1,13 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+datarootdir=@datarootdir@
+datadir=@datadir@
+includedir=@includedir@/glucose-board-@GLUCOSE_BOARD_ABI@/udev
+
+Name: glucose-board-udev-@GLUCOSE_BOARD_ABI@
+Description: Glucose Board UDev library
+Version: @GLUCOSE_BOARD_VERSION@
+Requires: glucose-board-@GLUCOSE_BOARD_ABI@
+Libs: -L${libdir} -lglucose-board-udev
+Cflags: -I${includedir}

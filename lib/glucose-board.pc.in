@@ -1,0 +1,14 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+datarootdir=@datarootdir@
+datadir=@datadir@
+includedir=@includedir@/glucose-board-@GLUCOSE_BOARD_ABI@
+dbusdir=@idbusdir@
+
+Name: maia-@GLUCOSE_BOARD_ABI@
+Description: Glucose Board library
+Version: @GLUCOSE_BOARD_VERSION@
+Requires:
+Libs: -L${libdir} -lglucose-board
+Cflags: -I${includedir}

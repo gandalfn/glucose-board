@@ -1,0 +1,5 @@
+[Module]
+Name=Abbott
+Description=Abbott module manager
+Module=.libs/libabbott.so
+DBus=org.freedesktop.GlucoseBoard.Module.Abbott

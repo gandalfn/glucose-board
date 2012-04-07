@@ -1,0 +1,13 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+datarootdir=@datarootdir@
+datadir=@datadir@
+includedir=@includedir@/glucose-board-@GLUCOSE_BOARD_ABI@/usb
+
+Name: glucose-board-usb-@GLUCOSE_BOARD_ABI@
+Description: Glucose Board USB library
+Version: @GLUCOSE_BOARD_VERSION@
+Requires: glucose-board-@GLUCOSE_BOARD_ABI@
+Libs: -L${libdir} -lglucose-board-usb
+Cflags: -I${includedir}

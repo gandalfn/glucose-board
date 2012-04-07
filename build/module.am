@@ -1,0 +1,23 @@
+GLUCOSE_BOARD_INTERNAL_VAPIS = \
+    $(top_srcdir)/lib/log/glucose-board-log.vapi
+
+include $(top_srcdir)/build/glucose-board.am
+
+BUILT_SOURCES = \
+    $(idbus_DATA)
+
+AM_LDFLAGS = -module -avoid-version -no-undefined
+GLUCOSE_BOARD_MODULE_LIBS =  \
+    $(GLUCOSE_BOARD_LIBS) \
+    $(top_builddir)/lib/libglucose-board.la \
+    $(top_builddir)/lib/usb/libglucose-board-usb.la \
+    $(top_builddir)/lib/udev/libglucose-board-udev.la
+
+module_DATA = $(GLUCOSE_BOARD_MODULE).module
+
+EXTRA_DIST += \
+    $(module_DATA) \
+    $(idbus_DATA)
+
+CLEANFILES += \
+    $(idbus_DATA)

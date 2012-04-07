@@ -1,0 +1,13 @@
+pkgconfigdir = $(libdir)/pkgconfig
+
+$(GLUCOSE_BOARD_LIB_NAME)-$(GLUCOSE_BOARD_ABI).pc: $(GLUCOSE_BOARD_LIB_NAME).pc
+	@cp $< $@
+
+pkgconfig_DATA = $(GLUCOSE_BOARD_LIB_NAME)-$(GLUCOSE_BOARD_ABI).pc
+
+EXTRA_DIST += \
+    $(GLUCOSE_BOARD_LIB_NAME).pc.in
+
+CLEANFILES += \
+    $(GLUCOSE_BOARD_LIB_NAME).pc \
+    $(pkgconfig_DATA)

@@ -1,0 +1,15 @@
+AUTOMAKE_OPTIONS = subdir-objects
+
+AM_CPPFLAGS = \
+    -DPACKAGE_LOCALE_DIR=\""$(prefix)/$(DATADIRNAME)/locale"\" \
+    -DPACKAGE_SRC_DIR=\""$(srcdir)"\" \
+    -DPACKAGE_DATA_DIR=\""$(datadir)"\"
+
+AM_CFLAGS =
+
+vapidir = $(pkgdatadir)/vapi
+
+EXTRA_DIST =
+
+CLEANFILES =
+

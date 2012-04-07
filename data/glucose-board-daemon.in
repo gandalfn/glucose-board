@@ -1,0 +1,48 @@
+#!/bin/bash
+### BEGIN INIT INFO
+# Provides:          glucose-board-daemon
+# Required-Start:    $remote_fs $syslog logon-server dbus
+# Required-Stop:     $remote_fs $syslog logon-server dbus
+# Should-Start:
+# Should-Stop:
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Integrate glucose board daemon into the boot process
+# Description: This script deals with some awkward details of integrating
+#              glucose board daemon start and stop on boot process.
+### END INIT INFO
+
+set -e
+
+. /lib/lsb/init-functions
+
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+DAEMON=@prefix@/bin/glucose-board-daemon
+NAME=glucose-board-daemon
+DESC="Glucose Board daemon"
+
+case "$1" in
+  start)
+    log_daemon_msg "Starting Glucose Board daemon"
+    if start-stop-daemon --start --quiet --oknodo --exec $DAEMON; then
+        log_end_msg 0
+    else
+        log_end_msg 1
+    fi
+    ;;
+  stop)
+    log_daemon_msg "Stopping Glucose Board daemon"
+    if start-stop-daemon --stop --quiet --oknodo --exec $DAEMON; then
+        log_end_msg 0
+    else
+        log_end_msg 1
+    fi
+    ;;
+  *)
+    N=/etc/init.d/$NAME
+    echo "Usage: $N {start|stop}" >&2
+    exit 1
+    ;;
+esac
+
+exit 0

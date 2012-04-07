@@ -1,0 +1,29 @@
+$(GLUCOSE_BOARD_LIB_NAME).vapi: lib$(subst -,_,$(GLUCOSE_BOARD_LIB_NAME))_la_vala.stamp
+
+$(GLUCOSE_BOARD_LIB_NAME)-$(GLUCOSE_BOARD_ABI).vapi: $(GLUCOSE_BOARD_EXTRA_VAPIS) $(GLUCOSE_BOARD_LIB_NAME).vapi
+	$(AM_V_GEN) cat $^ > $@
+
+$(GLUCOSE_BOARD_LIB_NAME)-$(GLUCOSE_BOARD_ABI).deps: $(GLUCOSE_BOARD_LIB_NAME).vapi $(GLUCOSE_BOARD_VAPI_DEPS)
+	$(AM_V_GEN) touch $@; \
+    for i in $(notdir $(basename $(GLUCOSE_BOARD_VAPI_DEPS))); \
+    do \
+        echo $$i >> $@; \
+    done
+
+VALAFLAGS += \
+    $(addprefix --pkg=, $(notdir $(basename $(GLUCOSE_BOARD_EXTRA_VAPIS)))) \
+    $(addprefix --vapidir=, $(dir $(GLUCOSE_BOARD_EXTRA_VAPIS)))
+
+vapi_DATA = \
+    $(GLUCOSE_BOARD_LIB_NAME)-$(GLUCOSE_BOARD_ABI).vapi \
+    $(GLUCOSE_BOARD_LIB_NAME)-$(GLUCOSE_BOARD_ABI).deps
+
+EXTRA_DIST += \
+    $(GLUCOSE_BOARD_LIB_NAME).vapi \
+    $(GLUCOSE_BOARD_EXTRA_VAPIS)
+
+CLEANFILES += \
+    $(vapi_DATA) \
+    $(GLUCOSE_BOARD_LIB_NAME).vapi \
+    $(GLUCOSE_BOARD_LIB_NAME)-$(GLUCOSE_BOARD_ABI).vapi \
+    $(GLUCOSE_BOARD_LIB_NAME)-$(GLUCOSE_BOARD_ABI).deps
