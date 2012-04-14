@@ -50,6 +50,20 @@ namespace GlucoseBoard
             RAM      = 0x05
         }
 
+        private enum Pipe
+        {
+            MODE_CONTINOUS = 0x01,
+            MODE_MASK      = 0x03,
+            TIMEOUT_MASK   = 0x7C,
+            TIMEOUT_ENABLE = 0x80
+        }
+
+        private enum Purge
+        {
+            OUTPUT = 0x00,
+            INPUT  = 0x80
+        }
+
         private struct UARTConfig
         {
             uint16 baud_rate;
@@ -109,6 +123,10 @@ namespace GlucoseBoard
             RTS  = 0x20
         }
 
+        // properties
+        private UARTConfig m_Config = UARTConfig ();
+
+        // methods
         /**
          * Create new TI3410 stream serial for inDevice
          *
@@ -191,34 +209,111 @@ namespace GlucoseBoard
             base.close ();
         }
 
-        public override void
-        configure (UsbStreamSerial.Config inConfig) throws StreamError
+        private void
+        set_config () throws StreamError
         {
-            UARTConfig config = UARTConfig ();
+            // set config message
+            var msg = new Message (10);
+            msg[0] = (uint8)(m_Config.baud_rate >> 8);
+            msg[1] = (uint8)m_Config.baud_rate;
+            msg[2] = (uint8)(m_Config.flags >> 8);
+            msg[3] = (uint8)m_Config.flags;
+            msg[4] = m_Config.data_bits;
+            msg[5] = m_Config.parity;
+            msg[6] = m_Config.stop_bits;
+            msg[7] = m_Config.xon;
+            msg[8] = m_Config.xoff;
+            msg[9] = m_Config.mode;
+
+            // send set_config message
+            uint8[] data = msg.raw;
+            Log.debug ("send serial configuration: %s", msg.to_string ());
+            send_control_message (LibUSB.RequestType.VENDOR | LibUSB.RequestRecipient.DEVICE | LibUSB.EndpointDirection.OUT,
+                                  Commands.SET_CONFIG, 0, Port.UART1, ref data);
+        }
+
+        private void
+        open_port () throws StreamError
+        {
+            // set open port message
+            uint16 settings = Pipe.MODE_CONTINOUS | Pipe.TIMEOUT_ENABLE | 2 << 2;
+
+            // send set_config message
+            uint8[]? data = null;
+            Log.debug ("send open port");
+            send_control_message (LibUSB.RequestType.VENDOR | LibUSB.RequestRecipient.DEVICE | LibUSB.EndpointDirection.OUT,
+                                  Commands.OPEN_PORT, settings, Port.UART1, ref data);
+        }
+
+        private void
+        close_port () throws StreamError
+        {
+            // send close_port message
+            uint8[]? data = null;
+            Log.debug ("send close port");
+            send_control_message (LibUSB.RequestType.VENDOR | LibUSB.RequestRecipient.DEVICE | LibUSB.EndpointDirection.OUT,
+                                  Commands.CLOSE_PORT, 0, Port.UART1, ref data);
+        }
+
+        private void
+        start_port () throws StreamError
+        {
+            // send set_config message
+            uint8[]? data = null;
+            Log.debug ("send start port");
+            send_control_message (LibUSB.RequestType.VENDOR | LibUSB.RequestRecipient.DEVICE | LibUSB.EndpointDirection.OUT,
+                                  Commands.START_PORT, 0, Port.UART1, ref data);
+        }
+
+        private void
+        purge_port ()
+        {
+            try
+            {
+                // send set_config message
+                uint8[]? data = null;
+                Log.debug ("send purge input port");
+                send_control_message (LibUSB.RequestType.VENDOR | LibUSB.RequestRecipient.DEVICE | LibUSB.EndpointDirection.OUT,
+                                      Commands.PURGE_PORT, Purge.INPUT, Port.UART1, ref data);
+
+                Log.debug ("send purge output port");
+                send_control_message (LibUSB.RequestType.VENDOR | LibUSB.RequestRecipient.DEVICE | LibUSB.EndpointDirection.OUT,
+                                      Commands.PURGE_PORT, Purge.OUTPUT, Port.UART1, ref data);
+            }
+            catch (StreamError err)
+            {
+                // ignore error on purge
+            }
+        }
+
+        public override void
+        configure (UsbStreamSerial.Config inConfig)
+        {
+            m_Config = UARTConfig ();
 
             // these flags must be set
-            config.flags = UARTFlags.ENABLE_MS_INTS | UARTFlags.ENABLE_AUTO_START_DMA;
+            m_Config.flags = UARTFlags.ENABLE_MS_INTS | UARTFlags.ENABLE_AUTO_START_DMA;
 
             // use rs232
-            config.mode = 0;
+            m_Config.mode = 0;
 
             // set baud rate
-            config.baud_rate = (uint16)(14769230.77 / (inConfig.baud_rate * 16));
+            m_Config.baud_rate = (uint16)(14769230.77 / (inConfig.baud_rate * 16));
 
             // set data bits
             switch (inConfig.bits)
             {
                 case 5:
-                    config.data_bits = UARTData.5_BITS;
+                    m_Config.data_bits = UARTData.5_BITS;
                     break;
                 case 6:
-                    config.data_bits = UARTData.6_BITS;
+                    m_Config.data_bits = UARTData.6_BITS;
                     break;
                 case 7:
-                    config.data_bits = UARTData.7_BITS;
+                    m_Config.data_bits = UARTData.7_BITS;
                     break;
                 case 8:
-                    config.data_bits = UARTData.8_BITS;
+                    m_Config.data_bits = UARTData.8_BITS;
                     break;
             }
 
@@ -226,52 +321,76 @@ namespace GlucoseBoard
             switch (inConfig.parity)
             {
                 case Parity.NONE:
-                    config.flags &= ~UARTFlags.ENABLE_PARITY_CHECKING;
-                    config.parity = UARTParity.NO_PARITY;
+                    m_Config.flags &= ~UARTFlags.ENABLE_PARITY_CHECKING;
+                    m_Config.parity = UARTParity.NO_PARITY;
                     break;
                 case Parity.ODD:
-                    config.flags |= UARTFlags.ENABLE_PARITY_CHECKING;
-                    config.parity = UARTParity.ODD_PARITY;
+                    m_Config.flags |= UARTFlags.ENABLE_PARITY_CHECKING;
+                    m_Config.parity = UARTParity.ODD_PARITY;
                     break;
                 case Parity.EVEN:
-                    config.flags |= UARTFlags.ENABLE_PARITY_CHECKING;
-                    config.parity = UARTParity.EVEN_PARITY;
+                    m_Config.flags |= UARTFlags.ENABLE_PARITY_CHECKING;
+                    m_Config.parity = UARTParity.EVEN_PARITY;
                     break;
             }
 
             // set stop bits
             if (inConfig.stop_bits == 2)
-                config.stop_bits = UARTStopBit.2_BITS;
+                m_Config.stop_bits = UARTStopBit.2_BITS;
             else
-                config.stop_bits = UARTStopBit.1_BITS;
+                m_Config.stop_bits = UARTStopBit.1_BITS;
 
             // set xon/xoff
-            config.xon = 0x11;
-            config.xoff = 0x13;
+            m_Config.xon = 0x11;
+            m_Config.xoff = 0x13;
             if (inConfig.xonxoff)
             {
-                config.flags |= UARTFlags.ENABLE_X_IN;
-                config.flags |= UARTFlags.ENABLE_X_OUT;
+                m_Config.flags |= UARTFlags.ENABLE_X_IN;
+                m_Config.flags |= UARTFlags.ENABLE_X_OUT;
             }
+        }
 
-            // set message
-            var msg = new Message (10);
-            msg[0] = (uint8)(config.baud_rate >> 8);
-            msg[1] = (uint8)config.baud_rate;
-            msg[2] = (uint8)(config.flags >> 8);
-            msg[3] = (uint8)config.flags;
-            msg[4] = config.data_bits;
-            msg[5] = config.parity;
-            msg[6] = config.stop_bits;
-            msg[7] = config.xon;
-            msg[8] = config.xoff;
-            msg[9] = config.mode;
+        /**
+         * {@inheritDoc}
+         */
+        public override void
+        open () throws StreamError
+        {
+            // Open usb stream
+            base.open ();
 
-            // send message
-            uint8[] data = msg.raw;
-            Log.debug ("send serial configuration: %s", msg.to_string ());
-            send_control_message (LibUSB.RequestType.VENDOR | LibUSB.RequestRecipient.DEVICE | LibUSB.EndpointDirection.OUT,
-                                  Commands.SET_CONFIG, 0, Port.UART1, ref data);
+            try
+            {
+                // Configure serial communication
+                set_config ();
+
+                // lock end point since open and start port
+                clear_halt_read_ep ();
+                clear_halt_write_ep ();
+
+                // Open port
+                open_port ();
+
+                // Start port
+                start_port ();
+            }
+            catch (StreamError err)
+            {
+                // Close usb stream on error
+                base.close ();
+                throw err;
+            }
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        public override void
+        close () throws StreamError
+        {
+            close_port ();
+
+            base.close ();
         }
     }
 }

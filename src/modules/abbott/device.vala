@@ -83,6 +83,35 @@ namespace GlucoseBoard.Module.Abbott
 
                 // Create USB stream
                 m_Stream = new TI3410Stream (this, m_UsbInterface, m_UsbEndPointRead, m_UsbEndPointWrite);
+
+                // Read end point is not available load firmware
+                if (!m_Stream.read_ep_available)
+                {
+                    load_firmware ();
+                }
+                else
+                {
+                    // Configure stream
+                    UsbStreamSerial.Config config = UsbStreamSerial.Config (9600, 8, UsbStreamSerial.Parity.NONE, 1, false);
+                    m_Stream.configure (config);
+
+                    // Open stream
+                    m_Stream.open ();
+
+                    // Send mem message
+                    m_Stream.send (new Message (), 1000);
+                    m_Stream.send (new Message.mem (), 1000);
+
+                    // Close stream
+                    m_Stream.close ();
+
+                    // Open stream
+                    m_Stream.open ();
+
+                    // Send xmem message
+                    m_Stream.send (new Message (), 1000);
+                    m_Stream.send (new Message.xmem (), 1000);
+                }
             }
             catch (GLib.Error err)
             {
@@ -109,7 +138,6 @@ namespace GlucoseBoard.Module.Abbott
                         case State.INIT:
                             Log.debug_mc ("abbott", "device", "Ack init");
                             m_State = State.READY;
-                            m_Stream.close ();
                             break;
                         case State.QUERY_ID:
                             on_ack_query_id ();
@@ -147,7 +175,6 @@ namespace GlucoseBoard.Module.Abbott
                         m_Stream.send (new Message.EOT (), 1000);
                         //Message msg = new Message ();
                         //m_Stream.recv (msg, 1000, on_wait_response);
-                        m_Stream.close ();
                         break;
                 }
             }
@@ -192,7 +219,7 @@ namespace GlucoseBoard.Module.Abbott
         /**
          * Load firmware
          */
-        public void
+        internal void
         load_firmware ()
         {
             Log.debug_mc ("abbott", "device", GLib.Log.METHOD);
@@ -210,26 +237,6 @@ namespace GlucoseBoard.Module.Abbott
         }
 
         /**
-         * Initialize device communication
-         */
-        public void
-        init ()
-        {
-            try
-            {
-                Log.info_mc ("abbott", "device", "Query blood meter id");
-                m_Stream.open ();
-                UsbStreamSerial.Config config = UsbStreamSerial.Config (9600, 8, UsbStreamSerial.Parity.NONE, 1, false);
-                m_Stream.configure (config);
-                m_Stream.close ();
-            }
-            catch (StreamError err)
-            {
-                Log.critical_mc ("abbott", "device", err.message);
-            }
-        }
-
-        /**
          * Query blood meter identifier
          */
         public void
@@ -240,7 +247,6 @@ namespace GlucoseBoard.Module.Abbott
             try
             {
                 Log.info_mc ("abbott", "device", "Query blood meter id");
-                m_Stream.open ();
                 m_Stream.send (new Message.ENQ (), 1000);
 
                 m_State = State.QUERY_ID_ENQ;

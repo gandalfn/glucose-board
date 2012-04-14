@@ -36,16 +36,14 @@ namespace GlucoseBoard
             public Parity  parity;
             public uint    stop_bits;
             public bool    xonxoff;
-            public bool    rtscts;
 
-            public Config (uint inBaudRate, uint inBits, Parity inParity, uint inStopBits, bool inXonXoff, bool inRtsCts)
+            public Config (uint inBaudRate, uint inBits, Parity inParity, uint inStopBits, bool inXonXoff)
             {
                 baud_rate = inBaudRate;
                 bits = inBits;
                 parity = inParity;
                 stop_bits = inStopBits;
                 xonxoff = inXonXoff;
-                rtscts = inRtsCts;
             }
         }
 
@@ -70,6 +68,6 @@ namespace GlucoseBoard
          * @throw StreamError whene something goes wrong
          */
         public abstract void
-        configure (Config inConfig) throws StreamError;
+        configure (Config inConfig);
     }
 }
