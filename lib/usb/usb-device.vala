@@ -29,7 +29,6 @@ namespace GlucoseBoard
 
         // properties
         private unowned LibUSB.Device? m_UsbDevice = null;
-        private bool                   m_IsOpen = false;
 
         // accessors
         /**
@@ -96,15 +95,6 @@ namespace GlucoseBoard
                 }
 
                 return 0;
-            }
-        }
-
-        /**
-         * ``true`` if device is opened
-         */
-        public bool is_open {
-            get {
-                return m_IsOpen;
             }
         }
 
@@ -234,23 +224,6 @@ namespace GlucoseBoard
             uint32 other_id = (inOther.vendor_id << 16) + (inOther.product_id & 0x0FFFF);
 
             return (int)(id - other_id);
-        }
-
-        /**
-         * Create a stream for the device
-         *
-         * @param inInterfaceNumber the interface number
-         * @param inEndPointRead the interface end point read
-         * @param inEndPointWrite the interface end point write
-         *
-         * @return the new stream for inInterfaceNumber and inEndPoint
-         *
-         * @throws StreamError raised if something went wrong
-         */
-        public Stream
-        create_stream (uint inInterfaceNumber, uint inEndPointRead, uint inEndPointWrite) throws StreamError
-        {
-            return new UsbStream (this, inInterfaceNumber, inEndPointRead, inEndPointWrite);
         }
     }
 }

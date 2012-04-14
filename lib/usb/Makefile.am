@@ -25,7 +25,9 @@ libglucose_board_usb_la_VALAFLAGS = \
 
 libglucose_board_usb_la_SOURCES = \
     usb-device.vala \
-    usb-stream.vala
+    usb-stream.vala \
+    usb-stream-serial.vala \
+    ti-3410-stream.vala
 
 libglucose_board_usb_la_LDFLAGS = \
     -version-number @GLUCOSE_BOARD_SO_VERSION@ \

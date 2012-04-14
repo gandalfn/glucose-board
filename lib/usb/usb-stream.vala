@@ -30,8 +30,23 @@ namespace GlucoseBoard
         private uint                 m_EndPointRead;
         private uint                 m_EndPointWrite;
         private LibUSB.TransferType  m_ReadTransferType;
+        private uint                 m_ReadMaxPacketSize;
         private LibUSB.TransferType  m_WriteTransferType;
+        private uint                 m_WriteMaxPacketSize;
         private LibUSB.DeviceHandle? m_Handle = null;
+
+        // accessors
+        public uint read_max_packet_size {
+            get {
+                return m_ReadMaxPacketSize;
+            }
+        }
+
+        public uint write_max_packet_size {
+            get {
+                return m_WriteMaxPacketSize;
+            }
+        }
 
         // methods
         /**
@@ -41,7 +56,7 @@ namespace GlucoseBoard
          * @param inInterfaceNumber the usb device interface number
          * @param inEndPointRead the usb device interface end point read
          */
-        internal UsbStream (UsbDevice inDevice, uint inInterfaceNumber, uint inEndPointRead, uint inEndPointWrite)
+        public UsbStream (UsbDevice inDevice, uint inInterfaceNumber, uint inEndPointRead, uint inEndPointWrite)
         {
             // Set properties
             m_Device = inDevice;
@@ -75,12 +90,14 @@ namespace GlucoseBoard
                                 if (descriptor.endpoint[n].bEndpointAddress == m_EndPointRead)
                                 {
                                     m_ReadTransferType = (LibUSB.TransferType)(descriptor.endpoint[n].bmAttributes & ((1 << 2) - 1));
+                                    m_ReadMaxPacketSize = descriptor.endpoint[n].wMaxPacketSize;
                                     found_read_ep = true;
                                 }
 
                                 if (descriptor.endpoint[n].bEndpointAddress == m_EndPointWrite)
                                 {
                                     m_WriteTransferType = (LibUSB.TransferType)(descriptor.endpoint[n].bmAttributes & ((1 << 2) - 1));
+                                    m_WriteMaxPacketSize = descriptor.endpoint[n].wMaxPacketSize;
                                     found_write_ep = true;
                                 }
                             }
@@ -168,37 +185,18 @@ namespace GlucoseBoard
         }
 
         public void
-        clear_end_point (uint8 inEndPoint)
-        {
-            m_Handle.clear_halt (inEndPoint);
-        }
-
-        public void
-        set_descriptor (uint16 inDescriptor) throws StreamError
+        send_control_message (uint8 inType, uint8 inRequest, uint16 inValue, uint16 inIndex, ref uint8[] outData) throws StreamError
         {
             if (!is_open)
                 throw new StreamError.NOT_OPENED ("the device %s has not been opened.", m_Device.path);
 
-            uint8 data[1];
-            int status = m_Handle.control_transfer (0x40, 0x07, inDescriptor, 0x03, data, 0, 1000);
-            if (status != LibUSB.Error.SUCCESS)
-            {
-                throw new StreamError.READ ("Error on read on %s %u %u: %s", m_Device.path, m_Interface, m_EndPointRead,
-                                            UsbDevice.usb_error_to_string (status));
-            }
-        }
+            GlucoseBoard.Log.debug ("Send control message 0x%x 0x%x 0x%x to usb device %s",
+                                    inRequest, inValue, inIndex, m_Device.path);
 
-        public void
-        set_address (uint16 inAddress) throws StreamError
-        {
-            if (!is_open)
-                throw new StreamError.NOT_OPENED ("the device %s has not been opened.", m_Device.path);
-
-            uint8 data[10];
-            int status = m_Handle.control_transfer (0x40, 0x0b, inAddress, 0x03, data, 10, 1000);
-            if (status != LibUSB.Error.SUCCESS)
+            int status = m_Handle.control_transfer (inType, inRequest, inValue, inIndex, outData, (uint16)outData.length, 1000);
+            if (status < LibUSB.Error.SUCCESS)
             {
-                throw new StreamError.READ ("Error on read on %s %u %u: %s", m_Device.path, m_Interface, m_EndPointRead,
+                throw new StreamError.WRITE ("Error on send control on %s %u %u: %s", m_Device.path, m_Interface, m_EndPointRead,
                                             UsbDevice.usb_error_to_string (status));
             }
         }
@@ -260,7 +258,7 @@ namespace GlucoseBoard
             {
                 int len;
                 int status = m_Handle.interrupt_transfer ((uint8)m_EndPointWrite, inMessage.raw, out len, inTimeout);
-                if (status != LibUSB.Error.SUCCESS)
+                if (status > LibUSB.Error.SUCCESS)
                 {
                     throw new StreamError.WRITE ("Error on read on %s %u %u: %s", m_Device.path, m_Interface, m_EndPointWrite,
                                                  UsbDevice.usb_error_to_string (status));

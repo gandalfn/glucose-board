@@ -63,22 +63,22 @@ namespace GlucoseBoard.Module.Abbott
 
         public Message.mem ()
         {
-            base (4);
-            this[1] = 'm';
-            this[2] = 'e';
-            this[3] = 'm';
+            base (3);
+            this[0] = 'm';
+            this[1] = 'e';
+            this[2] = 'm';
         }
 
         public Message.xmem ()
         {
-            base (8);
-            this[1] = 0x24;
-            this[2] = 'x';
-            this[3] = 'm';
-            this[4] = 'e';
-            this[5] = 'm';
-            this[6] = (uint8)Commands.CR;
-            this[7] = (uint8)Commands.LF;
+            base (7);
+            this[0] = 0x24;
+            this[1] = 'x';
+            this[2] = 'm';
+            this[3] = 'e';
+            this[4] = 'm';
+            this[5] = (uint8)Commands.CR;
+            this[6] = (uint8)Commands.LF;
         }
 
         public Message.STX ()

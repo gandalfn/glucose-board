@@ -32,7 +32,8 @@ namespace GlucoseBoard.Module.Abbott
             ENQ   = 1 << 1,
             MSG   = 1 << 2,
 
-            QUERY_ID     = 1 << 8,
+            INIT         = 1 << 8,
+            QUERY_ID     = 1 << 9,
             QUERY_ID_ENQ = QUERY_ID | ENQ,
             QUERY_ID_MSG = QUERY_ID | MSG,
 
@@ -53,8 +54,7 @@ namespace GlucoseBoard.Module.Abbott
         private string              m_Firmware;
 
         private State               m_State = State.READY;
-        private int                 m_Opened = 0;
-        private Stream              m_Stream = null;
+        private TI3410Stream        m_Stream = null;
 
         // accessors
         /**
@@ -80,6 +80,9 @@ namespace GlucoseBoard.Module.Abbott
                 m_UsbEndPointRead = (uint)m_Config.get_integer_hex (name, "EndPointRead");
                 m_UsbEndPointWrite = (uint)m_Config.get_integer_hex (name, "EndPointWrite");
                 m_Firmware = m_Config.get_string (name, "Firmware");
+
+                // Create USB stream
+                m_Stream = new TI3410Stream (this, m_UsbInterface, m_UsbEndPointRead, m_UsbEndPointWrite);
             }
             catch (GLib.Error err)
             {
@@ -94,61 +97,6 @@ namespace GlucoseBoard.Module.Abbott
         }
 
         private void
-        open_stream ()
-        {
-            Log.debug_mc ("abbott", "device", GLib.Log.METHOD);
-
-            // Create blood meter communication stream
-            if (m_Stream == null)
-            {
-                try
-                {
-                    m_Stream = create_stream (m_UsbInterface, m_UsbEndPointRead, m_UsbEndPointWrite);
-                    m_Stream.open ();
-                    m_Opened = 1;
-                }
-                catch (StreamError err)
-                {
-                    Log.critical_mc ("abbott", "device", "Error on open stream communication with blood meter: %s", err.message);
-                }
-            }
-            else
-            {
-                m_Opened++;
-            }
-
-            Log.debug_mc ("abbott", "device", "Open stream %i", m_Opened);
-        }
-
-        private void
-        close_stream ()
-        {
-            Log.debug_mc ("abbott", "device", GLib.Log.METHOD);
-
-            if (m_Stream != null)
-            {
-                Log.debug_mc ("abbott", "device", "Close stream %i", m_Opened);
-                if (m_Opened == 1)
-                {
-                    try
-                    {
-                        m_Stream.close ();
-                    }
-                    catch (StreamError err)
-                    {
-                        Log.critical_mc ("abbott", "device", "Error on close stream communication with blood meter: %s", err.message);
-                    }
-                    m_Stream = null;
-                    m_Opened = 0;
-                }
-                else
-                {
-                    m_Opened--;
-                }
-            }
-        }
-
-        private void
         on_wait_ack ()
         {
             try
@@ -158,6 +106,11 @@ namespace GlucoseBoard.Module.Abbott
                 {
                     switch (m_State & State.STEP_MASK)
                     {
+                        case State.INIT:
+                            Log.debug_mc ("abbott", "device", "Ack init");
+                            m_State = State.READY;
+                            m_Stream.close ();
+                            break;
                         case State.QUERY_ID:
                             on_ack_query_id ();
                             break;
@@ -194,7 +147,7 @@ namespace GlucoseBoard.Module.Abbott
                         m_Stream.send (new Message.EOT (), 1000);
                         //Message msg = new Message ();
                         //m_Stream.recv (msg, 1000, on_wait_response);
-                        close_stream ();
+                        m_Stream.close ();
                         break;
                 }
             }
@@ -236,95 +189,44 @@ namespace GlucoseBoard.Module.Abbott
             }
         }
 
+        /**
+         * Load firmware
+         */
         public void
         load_firmware ()
         {
             Log.debug_mc ("abbott", "device", GLib.Log.METHOD);
 
-            open_stream ();
-
             try
             {
                 Log.info_mc ("abbott", "device", "load firmware");
 
-                // Get firmware content
-                GLib.MappedFile firmware = new GLib.MappedFile (m_Firmware, false);
-
-                // Load firmware
-                size_t size = firmware.get_length ();
-                uint8* ptr = firmware.get_contents ();
-                bool first = true;
-
-                while (size > 0)
-                {
-                    // First frame
-                    if (first)
-                    {
-                        Message msg = new Message (64);
-                        msg[0] = 0x00;
-                        msg[1] = 0x38;
-                        msg[2] = 0xA1;
-                        msg.set_array (3, (uint8[])ptr, 61);
-                        size -= 61;
-                        ptr = ptr + 61;
-                        m_Stream.send (msg, 1000);
-                        first = false;
-                    }
-                    else
-                    {
-                        size_t n = size >= 64 ? 64 : size;
-                        Message msg = new Message ((uint)n);
-                        msg.set_array (0, (uint8[])ptr, (uint)n);
-                        m_Stream.send (msg, 1000);
-                        size -= n;
-                        ptr = ptr + n;
-                    }
-                }
-                ((UsbStream)m_Stream).reset ();
+                m_Stream.load_firmware (m_Firmware);
             }
             catch (GLib.Error err)
             {
                 Log.critical_mc ("abbott", "device", err.message);
             }
-
-            close_stream ();
         }
 
+        /**
+         * Initialize device communication
+         */
         public void
         init ()
         {
-            Log.debug_mc ("abbott", "device", GLib.Log.METHOD);
-
-            open_stream ();
-
             try
             {
-                Log.info_mc ("abbott", "device", "init");
-                //((UsbStream)m_Stream).set_descriptor (0x0000);
-                //((UsbStream)m_Stream).set_address (0x8000);
-                //m_Stream.send (new Message (), 5000);
-                m_Stream.send (new Message.mem (), 5000);
-                //((UsbStream)m_Stream).clear_end_point ((uint8)m_UsbEndPointRead);
-                //((UsbStream)m_Stream).clear_end_point ((uint8)m_UsbEndPointWrite);
+                Log.info_mc ("abbott", "device", "Query blood meter id");
+                m_Stream.open ();
+                UsbStreamSerial.Config config = UsbStreamSerial.Config (9600, 8, UsbStreamSerial.Parity.NONE, 1, false);
+                m_Stream.configure (config);
+                m_Stream.close ();
             }
-            catch (GLib.Error err)
+            catch (StreamError err)
             {
                 Log.critical_mc ("abbott", "device", err.message);
             }
-
-            try
-            {
-                //m_Stream.send (new Message (), 5000);
-                m_Stream.send (new Message.xmem (), 5000);
-                //((UsbStream)m_Stream).clear_end_point ((uint8)m_UsbEndPointRead);
-                //((UsbStream)m_Stream).clear_end_point ((uint8)m_UsbEndPointWrite);
-            }
-            catch (GLib.Error err)
-            {
-                Log.critical_mc ("abbott", "device", err.message);
-            }
-
-            close_stream ();
         }
 
         /**
@@ -338,7 +240,7 @@ namespace GlucoseBoard.Module.Abbott
             try
             {
                 Log.info_mc ("abbott", "device", "Query blood meter id");
-                open_stream ();
+                m_Stream.open ();
                 m_Stream.send (new Message.ENQ (), 1000);
 
                 m_State = State.QUERY_ID_ENQ;
@@ -348,7 +250,6 @@ namespace GlucoseBoard.Module.Abbott
             catch (StreamError err)
             {
                 Log.critical_mc ("abbott", "device", err.message);
-                close_stream ();
             }
         }
     }
