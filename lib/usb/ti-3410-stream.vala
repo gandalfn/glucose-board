@@ -22,6 +22,12 @@ namespace GlucoseBoard
     public class TI3410Stream : UsbStreamSerial
     {
         // types
+        public enum ConfigurationValue
+        {
+            BOOT = 0x01,
+            ACTIVE = 0x02
+        }
+
         private enum Commands
         {
             GET_VERSION       = 0x01,
@@ -74,6 +80,13 @@ namespace GlucoseBoard
             uint8 xon;
             uint8 xoff;
             uint8 mode;
+        }
+
+        public enum UARTType
+        {
+            RS232                   = 0x00,
+            RS485_RECEIVER_DISABLED = 0x01,
+            RS485_RECEIVER_ENABLED  = 0x02
         }
 
         private enum UARTFlags
@@ -197,6 +210,8 @@ namespace GlucoseBoard
                     }
                 }
 
+                Posix.usleep (100 * 1000);
+
                 // Reset device
                 reset ();
             }
@@ -295,7 +310,7 @@ namespace GlucoseBoard
             m_Config.flags = UARTFlags.ENABLE_MS_INTS | UARTFlags.ENABLE_AUTO_START_DMA;
 
             // use rs232
-            m_Config.mode = 0;
+            m_Config.mode = UARTType.RS232;
 
             // set baud rate
             m_Config.baud_rate = (uint16)(14769230.77 / (inConfig.baud_rate * 16));
@@ -363,10 +378,6 @@ namespace GlucoseBoard
             {
                 // Configure serial communication
                 set_config ();
-
-                // lock end point since open and start port
-                clear_halt_read_ep ();
-                clear_halt_write_ep ();
 
                 // Open port
                 open_port ();

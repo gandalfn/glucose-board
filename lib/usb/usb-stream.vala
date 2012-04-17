@@ -29,6 +29,7 @@ namespace GlucoseBoard
         private uint                 m_Interface;
         private uint                 m_EndPointRead;
         private uint                 m_EndPointWrite;
+        private uint8                m_ConfigurationValue;
         private bool                 m_ReadEndPointAvailable;
         private LibUSB.TransferType  m_ReadTransferType;
         private uint                 m_ReadMaxPacketSize;
@@ -62,6 +63,16 @@ namespace GlucoseBoard
             }
         }
 
+        public uint8 configuration_value {
+            get {
+                return m_ConfigurationValue;
+            }
+            set {
+                if (m_Handle != null)
+                    m_Handle.set_configuration (value);
+            }
+        }
+
         // methods
         /**
          * Create new usb stream for inDevice
@@ -86,6 +97,7 @@ namespace GlucoseBoard
                 bool found_interface = false;
                 m_ReadEndPointAvailable = false;
                 m_WriteEndPointAvailable = false;
+                m_ConfigurationValue = config.bConfigurationValue;
 
                 // Search interface
                 for (int cpt = 0; cpt < config.bNumInterfaces; ++cpt)

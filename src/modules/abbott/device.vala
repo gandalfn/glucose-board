@@ -85,7 +85,7 @@ namespace GlucoseBoard.Module.Abbott
                 m_Stream = new TI3410Stream (this, m_UsbInterface, m_UsbEndPointRead, m_UsbEndPointWrite);
 
                 // Read end point is not available load firmware
-                if (!m_Stream.read_ep_available)
+                if (m_Stream.configuration_value == TI3410Stream.ConfigurationValue.BOOT)
                 {
                     load_firmware ();
                 }
@@ -97,20 +97,6 @@ namespace GlucoseBoard.Module.Abbott
 
                     // Open stream
                     m_Stream.open ();
-
-                    // Send mem message
-                    m_Stream.send (new Message (), 1000);
-                    m_Stream.send (new Message.mem (), 1000);
-
-                    // Close stream
-                    m_Stream.close ();
-
-                    // Open stream
-                    m_Stream.open ();
-
-                    // Send xmem message
-                    m_Stream.send (new Message (), 1000);
-                    m_Stream.send (new Message.xmem (), 1000);
                 }
             }
             catch (GLib.Error err)
