@@ -48,9 +48,6 @@ namespace GlucoseBoard.Module.Abbott
         private int                 m_Index;
 
         private Config              m_Config;
-        private uint                m_UsbInterface;
-        private uint                m_UsbEndPointRead;
-        private uint                m_UsbEndPointWrite;
         private string              m_Firmware;
 
         private State               m_State = State.READY;
@@ -76,13 +73,10 @@ namespace GlucoseBoard.Module.Abbott
                 m_Config = new Config ("abbott.conf");
 
                 // Get usb communication parameters
-                m_UsbInterface = (uint)m_Config.get_integer_hex (name, "Interface");
-                m_UsbEndPointRead = (uint)m_Config.get_integer_hex (name, "EndPointRead");
-                m_UsbEndPointWrite = (uint)m_Config.get_integer_hex (name, "EndPointWrite");
                 m_Firmware = m_Config.get_string (name, "Firmware");
 
                 // Create USB stream
-                m_Stream = new TI3410Stream (this, m_UsbInterface, m_UsbEndPointRead, m_UsbEndPointWrite);
+                m_Stream = new TI3410Stream (this);
 
                 // Read end point is not available load firmware
                 if (m_Stream.configuration_value == TI3410Stream.ConfigurationValue.BOOT)

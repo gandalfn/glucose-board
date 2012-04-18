@@ -28,6 +28,13 @@ namespace GlucoseBoard
             ACTIVE = 0x02
         }
 
+        private enum Ep
+        {
+            READ            = 0x81,
+            WRITE           = 0x01,
+            INTERRUPT_READ  = 0x83
+        }
+
         private enum Commands
         {
             GET_VERSION       = 0x01,
@@ -68,6 +75,38 @@ namespace GlucoseBoard
         {
             OUTPUT = 0x00,
             INPUT  = 0x80
+        }
+
+        private enum RWData
+        {
+            ADDR_SFR    = 0x10,
+            ADDR_IDATA  = 0x20,
+            ADDR_XDATA  = 0x30,
+            ADDR_CODE   = 0x40,
+            ADDR_GPIO   = 0x50,
+            ADDR_I2C    = 0x60,
+            ADDR_FLASH  = 0x70,
+            ADDR_DSP    = 0x80,
+
+            UNSPECIFIED = 0x00,
+            BYTE        = 0x01,
+            WORD        = 0x02,
+            DOUBLE_WORD = 0x04
+        }
+
+        private enum Addr
+        {
+            UART1_BASE      = 0xFFA0,
+            UART2_BASE      = 0xFFB0,
+            UART_OFFSET_LCR = 0x0002,
+            UART_OFFSET_MCR = 0x0004
+        }
+
+        private enum MCR
+        {
+            LOOP = 0x04,
+            DTR  = 0x10,
+            RTS  = 0x20
         }
 
         private struct UARTConfig
@@ -136,6 +175,9 @@ namespace GlucoseBoard
             RTS  = 0x20
         }
 
+        // constant
+        const int cInterfaceNum = 0;
+
         // properties
         private UARTConfig m_Config = UARTConfig ();
 
@@ -144,13 +186,11 @@ namespace GlucoseBoard
          * Create new TI3410 stream serial for inDevice
          *
          * @param inDevice usb device to create stream for
-         * @param inInterfaceNumber the usb device interface number
-         * @param inEndPointRead the usb device interface end point read
          */
-        public TI3410Stream (UsbDevice inDevice, uint inInterfaceNumber, uint inEndPointRead, uint inEndPointWrite)
+        public TI3410Stream (UsbDevice inDevice)
         {
             // Launch base constructor
-            base (inDevice, inInterfaceNumber, inEndPointRead, inEndPointWrite);
+            base (inDevice, cInterfaceNum, Ep.READ, Ep.WRITE);
         }
 
         /**
@@ -248,6 +288,28 @@ namespace GlucoseBoard
         }
 
         private void
+        set_mcr () throws StreamError
+        {
+            // set config message
+            var msg = new Message (9);
+            msg[0] = RWData.ADDR_XDATA;
+            msg[1] = RWData.BYTE;
+            msg[2] = 1;
+            msg[3] = 0;
+            msg[4] = 0;
+            msg[5] = (uint8)(Addr.UART1_BASE >> 8);
+            msg[6] = (uint8)Addr.UART1_BASE;
+            msg[7] = MCR.LOOP | MCR.RTS | MCR.DTR;
+            msg[8] = MCR.RTS | MCR.DTR;
+
+            // send write_data message
+            uint8[] data = msg.raw;
+            Log.debug ("send set mcr: %s", msg.to_string ());
+            send_control_message (LibUSB.RequestType.VENDOR | LibUSB.RequestRecipient.DEVICE | LibUSB.EndpointDirection.OUT,
+                                  Commands.WRITE_DATA, 0, Port.RAM, ref data);
+        }
+
+        private void
         open_port () throws StreamError
         {
             // set open port message
@@ -285,15 +347,23 @@ namespace GlucoseBoard
         {
             try
             {
-                // send set_config message
+                // send purge input message
                 uint8[]? data = null;
                 Log.debug ("send purge input port");
                 send_control_message (LibUSB.RequestType.VENDOR | LibUSB.RequestRecipient.DEVICE | LibUSB.EndpointDirection.OUT,
                                       Commands.PURGE_PORT, Purge.INPUT, Port.UART1, ref data);
 
+                // Flush read interrupt
+                Message msg = new Message (2);
+                interrupt_read (Ep.INTERRUPT_READ, ref msg, 1000);
+
+                // send purge output message
                 Log.debug ("send purge output port");
                 send_control_message (LibUSB.RequestType.VENDOR | LibUSB.RequestRecipient.DEVICE | LibUSB.EndpointDirection.OUT,
                                       Commands.PURGE_PORT, Purge.OUTPUT, Port.UART1, ref data);
+
+                // Flush read interrupt
+                interrupt_read (Ep.INTERRUPT_READ, ref msg, 1000);
             }
             catch (StreamError err)
             {
@@ -379,11 +449,34 @@ namespace GlucoseBoard
                 // Configure serial communication
                 set_config ();
 
+                // Initialize Modem control
+                set_mcr ();
+
                 // Open port
                 open_port ();
 
                 // Start port
                 start_port ();
+
+                // Purge port
+                purge_port ();
+
+                // Clear and halt end point
+                clear_halt_read_ep ();
+                clear_halt_write_ep ();
+
+                // Configure serial communication
+                set_config ();
+
+                // Open port
+                open_port ();
+
+                // Start port
+                start_port ();
+
+                // Flush interrupt read
+                Message msg = new Message (2);
+                bulk_read (Ep.INTERRUPT_READ, ref msg, 1000);
             }
             catch (StreamError err)
             {

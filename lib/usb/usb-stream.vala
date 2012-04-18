@@ -242,7 +242,7 @@ namespace GlucoseBoard
          *
          * @throw StreamError if something goes wrong
          */
-        public void
+        protected void
         send_control_message (uint8 inType, uint8 inRequest, uint16 inValue, uint16 inIndex, ref uint8[]? outData) throws StreamError
         {
             if (!is_open)
@@ -262,6 +262,90 @@ namespace GlucoseBoard
         }
 
         /**
+         * Do a bulk read on usb device
+         *
+         * @param inEndPoint The end point address to read on
+         * @param inoutMessage The new message.
+         * @param inTimeout The waiting time for the new message in milliseconds.
+         *
+         * @throws StreamError raise when something went wrong
+         */
+        protected void
+        bulk_read (uint8 inEndPoint, ref Message inoutMessage, uint inTimeout) throws StreamError
+        {
+            int len;
+            int status = m_Handle.bulk_transfer (inEndPoint, inoutMessage.raw, out len, inTimeout);
+            if (status != LibUSB.Error.SUCCESS)
+            {
+                throw new StreamError.READ ("Error on bulk read on %s %u %u: %s", m_Device.path, m_Interface, m_EndPointRead,
+                                            UsbDevice.usb_error_to_string (status));
+            }
+        }
+
+        /**
+         * Do a interrupt read on usb device
+         *
+         * @param inEndPoint The end point address to read on
+         * @param inoutMessage The new message.
+         * @param inTimeout The waiting time for the new message in milliseconds.
+         *
+         * @throws StreamError raise when something went wrong
+         */
+        protected void
+        interrupt_read (uint8 inEndPoint, ref Message inoutMessage, uint inTimeout) throws StreamError
+        {
+            int len;
+            int status = m_Handle.interrupt_transfer (inEndPoint, inoutMessage.raw, out len, inTimeout);
+            if (status != LibUSB.Error.SUCCESS)
+            {
+                throw new StreamError.READ ("Error on interrupt read on %s %u %u: %s", m_Device.path, m_Interface, m_EndPointRead,
+                                            UsbDevice.usb_error_to_string (status));
+            }
+        }
+
+        /**
+         * Do a bulk write on usb device
+         *
+         * @param inEndPoint The end point address to write on
+         * @param inMessage The message to send
+         * @param inTimeout The waiting time for the new message in milliseconds.
+         *
+         * @throws StreamError raise when something went wrong
+         */
+        protected void
+        bulk_write (uint8 inEndPoint, Message inMessage, uint inTimeout) throws StreamError
+        {
+            int len;
+            int status = m_Handle.bulk_transfer (inEndPoint, inMessage.raw, out len, inTimeout);
+            if (status != LibUSB.Error.SUCCESS)
+            {
+                throw new StreamError.WRITE ("Error on bulk write on %s %u %u: %s", m_Device.path, m_Interface, m_EndPointWrite,
+                                             UsbDevice.usb_error_to_string (status));
+            }
+        }
+
+        /**
+         * Do an interrupt write on usb device
+         *
+         * @param inEndPoint The end point address to write on
+         * @param inMessage The message to send
+         * @param inTimeout The waiting time for the new message in milliseconds.
+         *
+         * @throws StreamError raise when something went wrong
+         */
+        protected void
+        interrupt_write (uint8 inEndPoint, Message inMessage, uint inTimeout) throws StreamError
+        {
+            int len;
+            int status = m_Handle.interrupt_transfer (inEndPoint, inMessage.raw, out len, inTimeout);
+            if (status > LibUSB.Error.SUCCESS)
+            {
+                throw new StreamError.WRITE ("Error on interrupt write on %s %u %u: %s", m_Device.path, m_Interface, m_EndPointWrite,
+                                             UsbDevice.usb_error_to_string (status));
+            }
+        }
+
+        /**
          * {@inheritDoc}
          */
         protected override void
@@ -273,23 +357,11 @@ namespace GlucoseBoard
 
             if (m_ReadTransferType == LibUSB.TransferType.BULK)
             {
-                int len;
-                int status = m_Handle.bulk_transfer ((uint8)m_EndPointRead, inoutMessage.raw, out len, inTimeout);
-                if (status != LibUSB.Error.SUCCESS)
-                {
-                    throw new StreamError.READ ("Error on read on %s %u %u: %s", m_Device.path, m_Interface, m_EndPointRead,
-                                                UsbDevice.usb_error_to_string (status));
-                }
+                bulk_read ((uint8)m_EndPointRead, ref inoutMessage, inTimeout);
             }
             else if (m_ReadTransferType == LibUSB.TransferType.INTERRUPT)
             {
-                int len;
-                int status = m_Handle.interrupt_transfer ((uint8)m_EndPointRead, inoutMessage.raw, out len, inTimeout);
-                if (status != LibUSB.Error.SUCCESS)
-                {
-                    throw new StreamError.READ ("Error on read on %s %u %u: %s", m_Device.path, m_Interface, m_EndPointRead,
-                                                UsbDevice.usb_error_to_string (status));
-                }
+                interrupt_read ((uint8)m_EndPointRead, ref inoutMessage, inTimeout);
             }
         }
 
@@ -305,24 +377,11 @@ namespace GlucoseBoard
             GlucoseBoard.Log.debug ("Send %s to usb device %s", inMessage.to_string (), m_Device.path);
             if (m_WriteTransferType == LibUSB.TransferType.BULK)
             {
-                int len;
-                int status = m_Handle.bulk_transfer ((uint8)m_EndPointWrite, inMessage.raw, out len, inTimeout);
-                if (status != LibUSB.Error.SUCCESS)
-                {
-                    throw new StreamError.WRITE ("Error on send on %s %u %u: %s", m_Device.path, m_Interface, m_EndPointWrite,
-                                                 UsbDevice.usb_error_to_string (status));
-                }
-                GlucoseBoard.Log.debug ("Sent %i to usb device %s", len, m_Device.path);
+                bulk_write ((uint8)m_EndPointWrite, inMessage, inTimeout);
             }
             else if (m_WriteTransferType == LibUSB.TransferType.INTERRUPT)
             {
-                int len;
-                int status = m_Handle.interrupt_transfer ((uint8)m_EndPointWrite, inMessage.raw, out len, inTimeout);
-                if (status > LibUSB.Error.SUCCESS)
-                {
-                    throw new StreamError.WRITE ("Error on read on %s %u %u: %s", m_Device.path, m_Interface, m_EndPointWrite,
-                                                 UsbDevice.usb_error_to_string (status));
-                }
+                interrupt_write ((uint8)m_EndPointWrite, inMessage, inTimeout);
             }
         }
     }
